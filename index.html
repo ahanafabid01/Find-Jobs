@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus AI | Multi-Source Job Matcher</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Chosen Palette: Deep Tech Slate & Neon Cyan/Emerald -->
+    <!-- Application Structure Plan: 2-column dashboard layout. Left: CV Data. Right: Multi-source live job feed. -->
+    <!-- Visualization & Content Choices: NO SVG. Radar Chart for skills. CSS/HTML for progress bars. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; 
+            color: #f8fafc; 
+        }
+
+        .chart-container { 
+            position: relative; 
+            width: 100%; 
+            max-width: 600px; 
+            margin-left: auto; 
+            margin-right: auto; 
+            height: 250px; 
+            max-height: 300px; 
+        } 
+        @media (min-width: 768px) { 
+            .chart-container { height: 300px; } 
+        }
+
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #1e293b; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #475569; }
+        
+        .loader {
+            border: 3px solid #1e293b;
+            border-top: 3px solid #06b6d4;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-6 lg:p-8">
+
+    <header class="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-center bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
+        <div>
+            <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
+                <span class="text-cyan-400 text-3xl">&#128187;</span> Nexus Job Discovery
+            </h1>
+            <p class="text-slate-400 text-sm mt-1">Multi-Source Global Matching for Ahanaf Abid Sazid</p>
+        </div>
+        <div class="mt-4 md:mt-0 flex items-center gap-4">
+            <button id="refreshJobsBtn" class="bg-cyan-600 hover:bg-cyan-500 text-white px-5 py-2 rounded-lg transition-colors text-sm font-medium flex items-center gap-2 shadow-lg shadow-cyan-500/20">
+                <span>&#128260;</span> Scan Global Boards
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Column 1: AI Configuration & CV Data -->
+        <section class="lg:col-span-4 bg-slate-800 rounded-xl border border-slate-700 shadow-lg flex flex-col overflow-hidden h-[800px]">
+            <div class="p-5 border-b border-slate-700 bg-slate-800/50">
+                <h2 class="text-lg font-semibold text-white">Your Profile Context</h2>
+                <p class="text-xs text-slate-400 mt-1">Skills extracted from your CV used to score jobs.</p>
+            </div>
+            <div class="p-5 flex-1 overflow-y-auto custom-scroll">
+                <div class="mb-6">
+                    <span class="text-sm font-medium text-slate-300 block mb-2">Target Roles</span>
+                    <div class="bg-slate-900 p-3 rounded border border-slate-700 text-cyan-400 text-sm font-medium">
+                        Software Engineer &bull; Web Developer
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <h3 class="text-sm font-medium text-slate-300 mb-3">Skill Weighting Model</h3>
+                    <div class="chart-container">
+                        <canvas id="skillsChart"></canvas>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-sm font-medium text-slate-300 mb-3">Core Keywords (Matching Engine)</h3>
+                    <div class="flex flex-wrap gap-2" id="keywordContainer">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Column 2: Live Scanning Feed -->
+        <section class="lg:col-span-8 bg-slate-800 rounded-xl border border-slate-700 shadow-lg flex flex-col overflow-hidden h-[800px]">
+            <div class="p-5 border-b border-slate-700 bg-slate-800/50 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                <div>
+                    <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                        <span class="text-emerald-400">&#127760;</span> Global & Local Opportunities
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-1">Aggregating Global APIs + Local Bangladesh Network.</p>
+                </div>
+                <div class="flex items-center gap-3 bg-slate-900 p-2 rounded-lg border border-slate-700">
+                    <label for="matchThreshold" class="text-xs text-slate-400 font-medium">Show Matches</label>
+                    <select id="matchThreshold" class="bg-slate-800 border border-slate-600 text-white text-sm rounded px-2 py-1 outline-none focus:border-cyan-500 cursor-pointer">
+                        <option value="30">30%+</option>
+                        <option value="40" selected>40%+</option>
+                        <option value="50">50%+</option>
+                        <option value="70">70%+</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="p-5 flex-1 overflow-y-auto custom-scroll bg-slate-900/50" id="jobFeedContainer">
+                <!-- Job cards populated by JS -->
+                <div class="flex flex-col items-center justify-center h-full text-slate-400 gap-3">
+                    <div class="loader"></div>
+                    <p>Initializing global matching engine...</p>
+                </div>
+            </div>
+            
+            <div class="p-3 border-t border-slate-700 bg-slate-800/80 text-center flex justify-center flex-wrap gap-4 text-xs text-slate-500">
+                <span>Sources:</span>
+                <span class="text-blue-400 font-medium">Remotive API</span>
+                <span class="text-purple-400 font-medium">Jobicy API</span>
+                <span class="text-orange-400 font-medium">Arbeitnow API</span>
+                <span class="text-emerald-400 font-medium border-l border-slate-600 pl-4">Local BD Network</span>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // --- Data Extraction from Source CV ---
+        const userProfile = {
+            name: "Ahanaf Abid Sazid",
+            roles: ["Software Engineer", "Web Application Developer", "Frontend Developer", "Backend Developer"],
+            skills: [
+                "JavaScript", "HTML", "CSS", "React", "Node.js", "PHP", 
+                "REST API", "MySQL", "MongoDB", "Git", "Postman", 
+                "Tailwind CSS", "Python", "Machine Learning", "CNN", "WordPress"
+            ],
+            skillCategories: {
+                "Frontend": 90,
+                "Backend": 75,
+                "Database": 80,
+                "Machine Learning": 70,
+                "Tools/API": 85
+            }
+        };
+
+        // State Management
+        let appState = {
+            minMatchThreshold: 40,
+            allJobs: [],
+            isFetching: false
+        };
+
+        // --- Core Logic Functions ---
+
+        function getScoreColor(score) {
+            if (score >= 70) return 'text-emerald-400';
+            if (score >= 50) return 'text-cyan-400';
+            if (score >= 40) return 'text-yellow-400';
+            return 'text-slate-400';
+        }
+        function getScoreBg(score) {
+            if (score >= 70) return 'bg-emerald-500';
+            if (score >= 50) return 'bg-cyan-500';
+            if (score >= 40) return 'bg-yellow-500';
+            return 'bg-slate-500';
+        }
+
+        // --- UI Rendering Functions ---
+
+        function renderKeywords() {
+            const container = document.getElementById('keywordContainer');
+            container.innerHTML = '';
+            userProfile.skills.forEach(skill => {
+                const badge = document.createElement('span');
+                badge.className = 'px-3 py-1.5 bg-slate-700/50 text-slate-200 rounded-md text-xs border border-slate-600 font-medium';
+                badge.innerText = skill;
+                container.appendChild(badge);
+            });
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('skillsChart').getContext('2d');
+            Chart.defaults.color = '#94a3b8';
+            Chart.defaults.font.family = "'Inter', sans-serif";
+
+            new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: Object.keys(userProfile.skillCategories),
+                    datasets: [{
+                        label: 'Profile Strength',
+                        data: Object.values(userProfile.skillCategories),
+                        backgroundColor: 'rgba(6, 182, 212, 0.2)',
+                        borderColor: 'rgba(6, 182, 212, 1)',
+                        pointBackgroundColor: 'rgba(16, 185, 129, 1)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgba(16, 185, 129, 1)',
+                        borderWidth: 2,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            angleLines: { color: 'rgba(148, 163, 184, 0.2)' },
+                            grid: { color: 'rgba(148, 163, 184, 0.2)' },
+                            pointLabels: { font: { size: 11 }, color: '#cbd5e1' },
+                            ticks: { display: false, min: 0, max: 100 }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.9)' }
+                    }
+                }
+            });
+        }
+
+        function renderJobFeed() {
+            const container = document.getElementById('jobFeedContainer');
+            container.innerHTML = '';
+
+            if (appState.isFetching) {
+                container.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-full text-cyan-400 gap-3">
+                        <div class="loader"></div>
+                        <p class="animate-pulse font-medium">Querying Global APIs & Scoring Descriptions...</p>
+                        <p class="text-xs text-slate-500">Checking Remotive, Jobicy, and Arbeitnow...</p>
+                    </div>`;
+                return;
+            }
+
+            // Filter by threshold and sort highest score first
+            const filteredJobs = appState.allJobs
+                .filter(job => job.matchScore >= appState.minMatchThreshold)
+                .sort((a, b) => b.matchScore - a.matchScore);
+
+            if(filteredJobs.length === 0) {
+                container.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-full text-slate-400">
+                        <span class="text-4xl mb-2">&#128683;</span>
+                        <p>No jobs found meeting the ${appState.minMatchThreshold}% match threshold.</p>
+                    </div>`;
+                return;
+            }
+
+            filteredJobs.forEach(job => {
+                const card = document.createElement('div');
+                card.className = 'bg-slate-800 p-5 rounded-xl mb-4 border border-slate-700 hover:border-cyan-500/50 transition-all shadow-md group';
+                
+                const matchedTags = job.skills.map(skill => {
+                    return `<span class="text-xs px-2 py-1 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-medium">${skill}</span>`;
+                }).join('');
+
+                const noSkillsText = job.skills.length === 0 ? `<span class="text-xs text-slate-500 italic">No exact keyword matches found.</span>` : '';
+                
+                // Color code the source badge
+                let sourceBadgeClass = 'bg-slate-700 text-slate-300';
+                if(job.source === 'Remotive') sourceBadgeClass = 'bg-blue-500/20 text-blue-300 border border-blue-500/30';
+                if(job.source === 'Jobicy') sourceBadgeClass = 'bg-purple-500/20 text-purple-300 border border-purple-500/30';
+                if(job.source === 'Arbeitnow') sourceBadgeClass = 'bg-orange-500/20 text-orange-300 border border-orange-500/30';
+                if(job.source === 'Local BD') sourceBadgeClass = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+
+                card.innerHTML = `
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1">
+                                <h3 class="text-white font-semibold text-lg leading-tight">
+                                    ${job.title}
+                                </h3>
+                                <span class="text-[10px] px-1.5 py-0.5 rounded ${sourceBadgeClass} whitespace-nowrap">${job.source}</span>
+                            </div>
+                            <p class="text-sm text-slate-400 flex flex-wrap items-center gap-2">
+                                <span class="font-medium text-slate-300">${job.company}</span> 
+                                <span>&bull;</span> 
+                                <span class="text-cyan-400/80 whitespace-nowrap">${job.type}</span>
+                                <span>&bull;</span> 
+                                <span class="whitespace-nowrap truncate max-w-[200px] text-slate-300" title="${job.location}">
+                                    ${job.location === 'Dhaka, Bangladesh' ? '🇧🇩 ' : ''}${job.location || 'Anywhere'}
+                                </span>
+                            </p>
+                        </div>
+                        <div class="flex flex-row md:flex-col items-center md:items-end gap-3 md:gap-0 bg-slate-900 md:bg-transparent p-3 md:p-0 rounded-lg border border-slate-700 md:border-none w-full md:w-auto">
+                            <div class="flex flex-col items-start md:items-end flex-1 md:flex-none">
+                                <span class="text-2xl font-bold ${getScoreColor(job.matchScore)} leading-none">${job.matchScore}%</span>
+                                <span class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mt-1">Match Score</span>
+                            </div>
+                            <a href="${job.url}" target="_blank" class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded text-sm font-medium transition-colors whitespace-nowrap shadow-md mt-0 md:mt-2">
+                                View & Apply &#8599;
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="w-full bg-slate-900 rounded-full h-1.5 mb-4 overflow-hidden border border-slate-700">
+                        <div class="${getScoreBg(job.matchScore)} h-1.5 rounded-full transition-all duration-1000" style="width: ${job.matchScore}%"></div>
+                    </div>
+
+                    <div>
+                        <p class="text-xs text-slate-500 mb-2 uppercase tracking-wide font-semibold">Highlighted CV Matches</p>
+                        <div class="flex flex-wrap gap-2">
+                            ${matchedTags}
+                            ${noSkillsText}
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // --- Multi-API Fetching & Scoring Logic ---
+        
+        function calculateScore(title, description, matchedSkills) {
+            let score = 15; // Base score for being an engineering job
+            score += (matchedSkills.length * 12);
+            
+            const titleLower = title.toLowerCase();
+            if (titleLower.includes('web') || titleLower.includes('frontend') || titleLower.includes('react') || titleLower.includes('node') || titleLower.includes('software engineer') || titleLower.includes('developer')) {
+                score += 20;
+            }
+            return Math.min(100, score);
+        }
+
+        async function fetchJobsConcurrently() {
+            appState.isFetching = true;
+            appState.allJobs = [];
+            renderJobFeed(); 
+
+            try {
+                // 1. Remotive API (Software Dev Category)
+                const fetchRemotive = fetch('https://remotive.com/api/remote-jobs?category=software-dev&limit=40')
+                    .then(res => res.json())
+                    .catch(() => null);
+
+                // 2. Jobicy API (Engineering Industry)
+                const fetchJobicy = fetch('https://jobicy.com/api/v2/remote-jobs?get=jobs&industry=engineering&count=40')
+                    .then(res => res.json())
+                    .catch(() => null);
+
+                // 3. Arbeitnow API (General, requires frontend filtering)
+                const fetchArbeitnow = fetch('https://www.arbeitnow.com/api/job-board-api')
+                    .then(res => res.json())
+                    .catch(() => null);
+
+                // Wait for all real APIs to finish
+                const results = await Promise.allSettled([fetchRemotive, fetchJobicy, fetchArbeitnow]);
+
+                let combinedJobs = [];
+
+                // --- 4. Inject Simulated Bangladesh Jobs ---
+                // (Since Bdjobs has no open API, we inject realistic local data for the prototype)
+                const bdJobs = [
+                    { id: 'bd_1', title: 'Junior Software Engineer (React/Node)', company: 'Brain Station 23', type: 'On-site', location: 'Dhaka, Bangladesh', url: '#', description: 'Looking for a junior developer with React, Node.js, HTML, CSS, and MySQL experience.' },
+                    { id: 'bd_2', title: 'Machine Learning Engineer', company: 'DataSoft Systems', type: 'Hybrid', location: 'Dhaka, Bangladesh', url: '#', description: 'Experience with Python, Machine Learning, CNN, and REST API development.' },
+                    { id: 'bd_3', title: 'Frontend Web Developer', company: 'Selise', type: 'On-site', location: 'Dhaka, Bangladesh', url: '#', description: 'Strong skills in JavaScript, React, Tailwind CSS, and Git required.' },
+                    { id: 'bd_4', title: 'Full Stack Developer (MERN)', company: 'bKash Limited', type: 'On-site', location: 'Dhaka, Bangladesh', url: '#', description: 'Join our fintech team. Needs MongoDB, React, Node.js, and Postman testing.' },
+                    { id: 'bd_5', title: 'PHP/Backend Developer', company: 'Pathao', type: 'Hybrid', location: 'Dhaka, Bangladesh', url: '#', description: 'Looking for PHP, MySQL, database management, and REST API experts.' }
+                ];
+
+                bdJobs.forEach(job => {
+                    const desc = job.description.toLowerCase();
+                    const matchedSkills = userProfile.skills.filter(s => desc.includes(s.toLowerCase()));
+                    
+                    combinedJobs.push({
+                        ...job,
+                        source: 'Local BD',
+                        skills: matchedSkills,
+                        matchScore: calculateScore(job.title, desc, matchedSkills)
+                    });
+                });
+
+                // --- Process Remotive Data ---
+                if (results[0].status === 'fulfilled' && results[0].value) {
+                    const remotiveData = results[0].value.jobs || [];
+                    remotiveData.forEach(job => {
+                        const desc = (job.description || '').toLowerCase();
+                        const matchedSkills = userProfile.skills.filter(s => desc.includes(s.toLowerCase()));
+                        
+                        combinedJobs.push({
+                            id: `rem_${job.id}`,
+                            title: job.title,
+                            company: job.company_name,
+                            type: job.job_type ? job.job_type.replace('_', ' ') : "Remote",
+                            location: job.candidate_required_location || 'Global',
+                            url: job.url,
+                            source: 'Remotive',
+                            skills: matchedSkills,
+                            matchScore: calculateScore(job.title, desc, matchedSkills)
+                        });
+                    });
+                }
+
+                // --- Process Jobicy Data ---
+                if (results[1].status === 'fulfilled' && results[1].value && results[1].value.success) {
+                    const jobicyData = results[1].value.jobs || [];
+                    jobicyData.forEach(job => {
+                        const desc = (job.jobDescription || '').toLowerCase();
+                        const matchedSkills = userProfile.skills.filter(s => desc.includes(s.toLowerCase()));
+                        
+                        combinedJobs.push({
+                            id: `jobi_${job.id}`,
+                            title: job.jobTitle,
+                            company: job.companyName,
+                            type: job.jobType ? job.jobType.join(', ') : "Remote",
+                            location: job.jobGeo || 'Global',
+                            url: job.url,
+                            source: 'Jobicy',
+                            skills: matchedSkills,
+                            matchScore: calculateScore(job.jobTitle, desc, matchedSkills)
+                        });
+                    });
+                }
+
+                // --- Process Arbeitnow Data ---
+                if (results[2].status === 'fulfilled' && results[2].value) {
+                    const arbeitnowData = results[2].value.data || [];
+                    arbeitnowData.forEach(job => {
+                        // Arbeitnow is a general board, so we filter for software/dev jobs locally
+                        const titleLower = (job.title || '').toLowerCase();
+                        const isTechJob = ['engineer', 'developer', 'software', 'frontend', 'backend', 'fullstack', 'web', 'react', 'node'].some(keyword => titleLower.includes(keyword));
+                        
+                        if(isTechJob) {
+                            const desc = (job.description || '').toLowerCase();
+                            const matchedSkills = userProfile.skills.filter(s => desc.includes(s.toLowerCase()));
+                            
+                            combinedJobs.push({
+                                id: `arb_${job.slug}`,
+                                title: job.title,
+                                company: job.company_name,
+                                type: (job.job_types && job.job_types[0]) ? job.job_types[0] : "Full-time",
+                                location: job.location || (job.remote ? 'Remote' : 'Various'),
+                                url: job.url,
+                                source: 'Arbeitnow',
+                                skills: matchedSkills,
+                                matchScore: calculateScore(job.title, desc, matchedSkills)
+                            });
+                        }
+                    });
+                }
+
+                appState.allJobs = combinedJobs;
+
+            } catch (error) {
+                console.error("Error in concurrent fetch:", error);
+                document.getElementById('jobFeedContainer').innerHTML = `<div class="text-red-400 text-center py-10">Error aggregating job boards. Please try again later.</div>`;
+            } finally {
+                appState.isFetching = false;
+                renderJobFeed();
+            }
+        }
+
+        // --- Initialization & Event Listeners ---
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderKeywords();
+            initChart();
+            
+            // Initial fetch from all 3 APIs
+            fetchJobsConcurrently();
+
+            // Controls
+            document.getElementById('matchThreshold').addEventListener('change', (e) => {
+                appState.minMatchThreshold = parseInt(e.target.value);
+                renderJobFeed(); 
+            });
+
+            document.getElementById('refreshJobsBtn').addEventListener('click', () => {
+                fetchJobsConcurrently(); 
+            });
+        });
+    </script>
+</body>
+</html>
